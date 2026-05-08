@@ -9,9 +9,7 @@ const SmartMoneyDashboard = () => {
   const [alerts, setAlerts] = useState([]);
   const [smartMoneyScore, setSmartMoneyScore] = useState(0);
   const [selectedStrike, setSelectedStrike] = useState(null);
-  const [chartData, setChartData] = useState(null);
   const [sectorHeatmap, setSectorHeatmap] = useState([]);
-  const [loading, setLoading] = useState(false);
 
   // Generate mock heatmap data
   const generateHeatmapData = useCallback((tickerSymbol, currentPrice) => {
