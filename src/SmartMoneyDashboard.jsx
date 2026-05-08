@@ -1,33 +1,42 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import './Dashboard.css';
 
 const SmartMoneyDashboard = () => {
-  const [ticker, setTicker] = useState('SPY');
-  const [price, setPrice] = useState(7353.94);
-  const [priceChange, setPriceChange] = useState(1.30);
-  const [heatmapData, setHeatmapData] = useState([]);
-  const [alerts, setAlerts] = useState([]);
-  const [smartMoneyScore, setSmartMoneyScore] = useState(0);
-  const [selectedStrike, setSelectedStrike] = useState(null);
-  const [sectorHeatmap, setSectorHeatmap] = useState([]);
+  const [customTicker, setCustomTicker] = useState('QQQ');
+  const [customTickerInput, setCustomTickerInput] = useState('');
+  
+  const tickerData = {
+    SPX: { price: 5932.80, priceChange: 1.45, basePrice: 5930 },
+    SPY: { price: 585.43, priceChange: 1.30, basePrice: 585 },
+    QQQ: { price: 428.75, priceChange: 2.12, basePrice: 425 },
+    NVDA: { price: 134.52, priceChange: 0.85, basePrice: 135 },
+    AAPL: { price: 234.18, priceChange: -0.45, basePrice: 234 },
+    TSLA: { price: 312.45, priceChange: 3.22, basePrice: 310 },
+  };
 
-  // Generate mock heatmap data
-  const generateHeatmapData = useCallback((tickerSymbol, currentPrice) => {
+  const expirationRanges = {
+    quick: ['0DTE', '2DTE', '4DTE', '7DTE'],
+    monthly: ['14DTE', '21DTE', '30DTE', '45DTE'],
+  };
+
+  const [heatmapDataAll, setHeatmapDataAll] = useState({});
+  const [expandedMonthlyData, setExpandedMonthlyData] = useState([]);
+  const [smartMoneyScoreAll, setSmartMoneyScoreAll] = useState({});
+  const [goldenSweepsAll, setGoldenSweepsAll] = useState([]);
+
+  const generateHeatmapData = useCallback((ticker, basePrice, expirations) => {
     const strikes = [];
-    const baseStrike = Math.floor(currentPrice / 5) * 5;
+    const baseStrike = Math.floor(basePrice / 5) * 5;
     
     for (let i = -10; i <= 10; i++) {
       const strike = baseStrike + (i * 5);
-      const expirations = ['0DTE', '7DTE', '14DTE', '30DTE'];
       
       expirations.forEach((exp) => {
         const daysToExp = parseInt(exp);
-        const isOTM = i !== 0; // Strike is OTM if not at current price
+        const isOTM = i !== 0;
         const baseVolume = Math.random() * 5000 + 1000;
         const baseOI = Math.random() * 10000 + 5000;
         const volumeChange = ((Math.random() - 0.3) * 100).toFixed(1);
         
-        // Golden Sweep detection logic
         const premium = (Math.random() * 2000000 + 100000).toFixed(0);
         const vOiRatio = (baseVolume / baseOI).toFixed(2);
         const isAskSide = Math.random() > 0.3;
@@ -43,17 +52,15 @@ const SmartMoneyDashboard = () => {
         const callOrPut = Math.random() > 0.5 ? 'call' : 'put';
         const isBullish = (callOrPut === 'call' && isAskSide) || (callOrPut === 'put' && !isAskSide);
         
-        // Calculate smart money score contribution
-        let scoreContribution = 50; // base neutral
+        let scoreContribution = 50;
         scoreContribution += isBullish ? 10 : -10;
         scoreContribution += vOiRatio > 3 ? 15 : 0;
         scoreContribution += premium > 500000 ? 15 : premium > 100000 ? 5 : 0;
         scoreContribution += isSweep ? 10 : 0;
         scoreContribution += isGoldenSweep ? 25 : 0;
         
-        // Color intensity calculation
         const intensity = Math.log(premium / 10000) / Math.log(10);
-        const hue = isBullish ? 120 : 0; // Green for bullish, red for bearish
+        const hue = isBullish ? 120 : 0;
         const saturation = Math.min(100, intensity * 30);
         const lightness = 45;
         
@@ -64,14 +71,15 @@ const SmartMoneyDashboard = () => {
           volume: baseVolume.toFixed(0),
           openInterest: baseOI.toFixed(0),
           volumeChange: parseFloat(volumeChange),
-          premium: premium,
-          vOiRatio: vOiRatio,
+          premium: parseFloat(premium),
+          vOiRatio: parseFloat(vOiRatio),
           isAskSide,
           isSweep,
           isGoldenSweep,
           scoreContribution,
           color: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
           intensity,
+          ticker,
         });
       });
     }
@@ -79,265 +87,231 @@ const SmartMoneyDashboard = () => {
     return strikes;
   }, []);
 
-  // Generate sector heatmap
-  const generateSectorHeatmap = useCallback(() => {
-    const sectors = [
-      { name: 'Tech', change: 2.3, bullishCount: 12, bearishCount: 3 },
-      { name: 'Finance', change: 1.8, bullishCount: 8, bearishCount: 5 },
-      { name: 'Healthcare', change: -0.5, bullishCount: 4, bearishCount: 9 },
-      { name: 'Energy', change: 3.2, bullishCount: 10, bearishCount: 2 },
-      { name: 'Retail', change: 0.8, bullishCount: 6, bearishCount: 7 },
-    ];
-    
-    return sectors.map((sector) => ({
-      ...sector,
-      color: sector.change >= 0 ? 'hsl(120, 70%, 45%)' : 'hsl(0, 70%, 45%)',
-    }));
+  const calculateSmartMoneyScore = useCallback((data) => {
+    if (data.length === 0) return 0;
+    const avgScore = data.reduce((sum, d) => sum + d.scoreContribution, 0) / data.length;
+    return Math.min(100, Math.max(0, Math.round(avgScore)));
   }, []);
 
-  // Initialize data on mount
+  const getGrade = (score) => {
+    if (score >= 90) return 'A+';
+    if (score >= 80) return 'A';
+    if (score >= 70) return 'B+';
+    if (score >= 60) return 'B';
+    return 'C';
+  };
+
   useEffect(() => {
-    setLoading(true);
-    const data = generateHeatmapData(ticker, price);
-    setHeatmapData(data);
-    setSectorHeatmap(generateSectorHeatmap());
+    const allData = {};
+    const allScores = {};
+    const allGoldenSweeps = [];
     
-    // Check for golden sweeps
-    const goldenSweeps = data.filter(d => d.isGoldenSweep);
-    if (goldenSweeps.length > 0) {
-      const newAlerts = goldenSweeps.map((sweep) => ({
-        id: Math.random(),
-        type: 'golden-sweep',
-        message: `🔥 GOLDEN SWEEP: ${ticker} ${sweep.strike} ${sweep.callOrPut.toUpperCase()} | ${sweep.expiration} | Premium: $${(sweep.premium / 1000).toFixed(0)}K`,
-        timestamp: new Date(),
-        severity: 'high',
-      }));
-      setAlerts((prev) => [...newAlerts, ...prev].slice(0, 10));
+    [{ name: 'SPX', data: tickerData.SPX }, 
+     { name: 'SPY', data: tickerData.SPY },
+     { name: customTicker, data: tickerData[customTicker] || { price: 100, basePrice: 100 } }
+    ].forEach(({ name, data }) => {
+      const quickData = generateHeatmapData(name, data.basePrice, expirationRanges.quick);
+      const monthlyData = generateHeatmapData(name, data.basePrice, expirationRanges.monthly);
+      
+      allData[name] = quickData;
+      allScores[name] = calculateSmartMoneyScore(quickData);
+      
+      const goldenSweeps = [...quickData, ...monthlyData].filter(d => d.isGoldenSweep);
+      goldenSweeps.forEach(sweep => {
+        allGoldenSweeps.push({
+          ticker: name,
+          strike: sweep.strike,
+          type: sweep.callOrPut.toUpperCase(),
+          expiration: sweep.expiration,
+          premium: sweep.premium,
+          score: sweep.scoreContribution,
+          grade: getGrade(sweep.scoreContribution),
+        });
+      });
+    });
+    
+    allGoldenSweeps.sort((a, b) => b.premium - a.premium);
+    
+    const monthlyData = generateHeatmapData(customTicker, tickerData[customTicker]?.basePrice || 100, expirationRanges.monthly);
+    
+    setHeatmapDataAll(allData);
+    setSmartMoneyScoreAll(allScores);
+    setGoldenSweepsAll(allGoldenSweeps.slice(0, 15));
+    setExpandedMonthlyData(monthlyData);
+  }, [customTicker, generateHeatmapData, calculateSmartMoneyScore]);
+
+  const handleTickerSearch = (e) => {
+    const value = e.target.value.toUpperCase();
+    setCustomTickerInput(value);
+    if (value && tickerData[value]) {
+      setCustomTicker(value);
+      setCustomTickerInput('');
+    }
+  };
+
+  const renderHeatmap = (ticker, data) => {
+    const strikes = [];
+    const baseStrike = Math.floor((tickerData[ticker]?.basePrice || 100) / 5) * 5;
+    
+    for (let i = -10; i <= 10; i++) {
+      const strikePrice = baseStrike + (i * 5);
+      const strikeData = data.filter(d => d.strike === strikePrice);
+      strikes.push({ price: strikePrice, data: strikeData });
     }
     
-    // Calculate average smart money score
-    const avgScore = Math.round(data.reduce((sum, d) => sum + d.scoreContribution, 0) / data.length);
-    setSmartMoneyScore(Math.min(100, Math.max(0, avgScore)));
-    
-    setLoading(false);
-  }, [ticker, price, generateHeatmapData, generateSectorHeatmap]);
-
-  // Simulate real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPrice((prev) => {
-        const change = (Math.random() - 0.5) * 5;
-        return parseFloat((prev + change).toFixed(2));
-      });
-      
-      setPriceChange((prev) => {
-        const change = (Math.random() - 0.5) * 0.5;
-        return parseFloat((prev + change).toFixed(2));
-      });
-    }, 15000); // 15 second updates
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleStrikeClick = (strike) => {
-    setSelectedStrike(strike);
-    // Generate mock chart data
-    const mockChartData = Array.from({ length: 20 }, (_, i) => ({
-      time: i,
-      open: price + (Math.random() - 0.5) * 10,
-      high: price + (Math.random() * 10),
-      low: price - (Math.random() * 10),
-      close: price + (Math.random() - 0.5) * 10,
-    }));
-    setChartData(mockChartData);
-  };
-
-  const handleSectorClick = (sector) => {
-    setTicker(sector.name); // Simplified - would normally drill into sector stocks
-  };
-
-  // Render heatmap cell with intensity-based coloring
-  const renderHeatmapCell = (data) => {
-    const intensity = Math.min(100, data.intensity * 40);
-    const isSelected = selectedStrike?.strike === data.strike && selectedStrike?.expiration === data.expiration;
-    
     return (
-      <div
-        key={`${data.strike}-${data.expiration}`}
-        className={`heatmap-cell ${isSelected ? 'selected' : ''} ${data.isGoldenSweep ? 'golden-sweep' : ''}`}
-        style={{
-          backgroundColor: data.color,
-          opacity: 0.4 + (intensity / 100) * 0.6,
-          borderColor: data.isGoldenSweep ? '#FFD700' : 'transparent',
-          borderWidth: data.isGoldenSweep ? '2px' : '1px',
-          cursor: 'pointer',
-        }}
-        onClick={() => handleStrikeClick(data)}
-        title={`${data.strike} ${data.expiration} | Vol: ${data.volume} | OI: ${data.openInterest} | Change: ${data.volumeChange}%`}
-      >
-        {data.isGoldenSweep && <span className="golden-indicator">⭐</span>}
-        <span className="volume-change">{data.volumeChange > 0 ? '+' : ''}{data.volumeChange.toFixed(0)}%</span>
+      <div className="heatmap-container">
+        <div className="heatmap-header">
+          <div className="ticker-title">{ticker}</div>
+          <div className="price-info">
+            ${tickerData[ticker]?.price.toFixed(2)} 
+            <span className={tickerData[ticker]?.priceChange >= 0 ? 'positive' : 'negative'}>
+              {tickerData[ticker]?.priceChange >= 0 ? '+' : ''}{tickerData[ticker]?.priceChange.toFixed(2)}%
+            </span>
+          </div>
+        </div>
+        
+        <div className="heatmap-grid">
+          <div className="heatmap-body">
+            {strikes.map((strike) => (
+              <div key={strike.price} className="heatmap-row">
+                <div className="strike-label">{strike.price}</div>
+                {data.filter(d => d.strike === strike.price).map((cell, idx) => (
+                  <div
+                    key={idx}
+                    className={`heatmap-cell ${cell.isGoldenSweep ? 'golden-sweep' : ''}`}
+                    style={{
+                      backgroundColor: cell.color,
+                      opacity: 0.4 + (cell.intensity / 100) * 0.6,
+                      borderColor: cell.isGoldenSweep ? '#FFD700' : 'transparent',
+                    }}
+                    title={`${cell.strike} ${cell.expiration} | Vol: ${cell.volume} | Change: ${cell.volumeChange}%`}
+                  >
+                    {cell.isGoldenSweep && <span className="golden-indicator">⭐</span>}
+                    <span className="vol-change">{cell.volumeChange > 0 ? '+' : ''}{cell.volumeChange.toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   };
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <header className="dashboard-header">
-        <div className="header-left">
-          <h1>Smart Money Options Flow</h1>
-          <div className="ticker-search">
+    <div className="dashboard-main">
+      <div className="left-panel">
+        <div className="heatmap-wrapper">
+          {renderHeatmap('SPX', heatmapDataAll['SPX'] || [])}
+        </div>
+        <div className="heatmap-wrapper">
+          {renderHeatmap('SPY', heatmapDataAll['SPY'] || [])}
+        </div>
+        <div className="heatmap-wrapper">
+          <div className="custom-ticker-search">
             <input
               type="text"
               placeholder="Search ticker..."
-              value={ticker}
-              onChange={(e) => setTicker(e.target.value.toUpperCase())}
-              className="ticker-input"
+              value={customTickerInput}
+              onChange={handleTickerSearch}
+              className="search-input"
             />
           </div>
+          {renderHeatmap(customTicker, heatmapDataAll[customTicker] || [])}
         </div>
-        <div className="header-center">
-          <div className="price-display">
-            <span className="price">${price.toFixed(2)}</span>
-            <span className={`change ${priceChange >= 0 ? 'positive' : 'negative'}`}>
-              {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
-            </span>
-          </div>
-        </div>
-        <div className="header-right">
-          <div className="smart-money-score">
-            <div className="score-label">Smart Money Score</div>
-            <div className={`score-value score-${Math.floor(smartMoneyScore / 25)}`}>
-              {smartMoneyScore}
-            </div>
-          </div>
-        </div>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <div className="main-content">
-        {/* Left Sidebar - Sector Heatmap */}
-        <aside className="sidebar-left">
-          <h2>Sector Heat</h2>
-          <div className="sector-heatmap">
-            {sectorHeatmap.map((sector) => (
-              <div
-                key={sector.name}
-                className="sector-card"
-                style={{ backgroundColor: sector.color }}
-                onClick={() => handleSectorClick(sector)}
-              >
-                <div className="sector-name">{sector.name}</div>
-                <div className="sector-change">{sector.change >= 0 ? '+' : ''}{sector.change.toFixed(1)}%</div>
-                <div className="sector-flows">
-                  <span className="bullish">📈 {sector.bullishCount}</span>
-                  <span className="bearish">📉 {sector.bearishCount}</span>
+      <div className="right-panel">
+        <div className="grid-cell top-left">
+          <div className="cell-header">Expanded Monthly Heatmap</div>
+          <div className="heatmap-expanded">
+            {renderHeatmap(`${customTicker} (Monthly)`, expandedMonthlyData)}
+          </div>
+        </div>
+
+        <div className="grid-cell top-right">
+          <div className="cell-header">Real-time Flow Scorecard</div>
+          <div className="scorecard-container">
+            <div className="score-display">
+              <div className="score-spx">
+                <div className="score-label">SPX</div>
+                <div className={`score-value grade-${getGrade(smartMoneyScoreAll['SPX'] || 0)}`}>
+                  {smartMoneyScoreAll['SPX'] || 0}
                 </div>
+                <div className="score-grade">{getGrade(smartMoneyScoreAll['SPX'] || 0)}</div>
               </div>
-            ))}
-          </div>
-        </aside>
-
-        {/* Center - Heatmap & Chart */}
-        <div className="center-content">
-          {/* Options Heatmap */}
-          <div className="heatmap-container">
-            <h2>Options Flow Heatmap</h2>
-            <div className="heatmap-legend">
-              <span className="legend-item">🟢 Bullish</span>
-              <span className="legend-item">🔴 Bearish</span>
-              <span className="legend-item">🟣 High Conviction</span>
-              <span className="legend-item">⭐ Golden Sweep</span>
-            </div>
-            <div className="heatmap-grid">
-              <div className="heatmap-header">
-                <div className="strike-column">STRIKE</div>
-                {['0DTE', '7DTE', '14DTE', '30DTE'].map((exp) => (
-                  <div key={exp} className="expiration-column">{exp}</div>
-                ))}
+              <div className="score-spy">
+                <div className="score-label">SPY</div>
+                <div className={`score-value grade-${getGrade(smartMoneyScoreAll['SPY'] || 0)}`}>
+                  {smartMoneyScoreAll['SPY'] || 0}
+                </div>
+                <div className="score-grade">{getGrade(smartMoneyScoreAll['SPY'] || 0)}</div>
               </div>
-              <div className="heatmap-body">
-                {Array.from({ length: 21 }, (_, i) => {
-                  const strikeGroup = i - 10;
-                  const baseStrike = Math.floor(price / 5) * 5;
-                  const strikePrice = baseStrike + (strikeGroup * 5);
-                  
-                  return (
-                    <div key={strikePrice} className="heatmap-row">
-                      <div className="strike-label">{strikePrice}</div>
-                      {['0DTE', '7DTE', '14DTE', '30DTE'].map((exp) => {
-                        const cellData = heatmapData.find((d) => d.strike === strikePrice && d.expiration === exp);
-                        return cellData ? renderHeatmapCell(cellData) : <div key={`${strikePrice}-${exp}`} className="heatmap-cell empty" />;
-                      })}
-                    </div>
-                  );
-                })}
+              <div className={`score-custom grade-${customTicker}`}>
+                <div className="score-label">{customTicker}</div>
+                <div className={`score-value grade-${getGrade(smartMoneyScoreAll[customTicker] || 0)}`}>
+                  {smartMoneyScoreAll[customTicker] || 0}
+                </div>
+                <div className="score-grade">{getGrade(smartMoneyScoreAll[customTicker] || 0)}</div>
               </div>
             </div>
-          </div>
 
-          {/* Chart Panel */}
-          {selectedStrike && (
-            <div className="chart-container">
-              <h3>{ticker} {selectedStrike.strike} {selectedStrike.callOrPut.toUpperCase()} | {selectedStrike.expiration}</h3>
-              <div className="chart-mock">
-                <div className="chart-placeholder">
-                  <span>Chart View - {selectedStrike.strike} Strike</span>
-                  <span className="small">Volume: {selectedStrike.volume} | OI: {selectedStrike.openInterest}</span>
-                  <span className="small">Premium: ${(selectedStrike.premium / 1000).toFixed(0)}K | V/OI: {selectedStrike.vOiRatio}</span>
+            <div className="alerts-section">
+              <div className="section-title">Flow Alerts</div>
+              <div className="alerts-list">
+                <div className="alert-item">
+                  <span className="alert-label">Sweep Activity</span>
+                  <span className="alert-value">{goldenSweepsAll.length}</span>
+                </div>
+                <div className="alert-item">
+                  <span className="alert-label">Golden Sweeps</span>
+                  <span className="alert-value">{goldenSweepsAll.filter(g => g.grade === 'A+').length}</span>
+                </div>
+                <div className="alert-item">
+                  <span className="alert-label">A-Grade Activity</span>
+                  <span className="alert-value">{goldenSweepsAll.filter(g => g.grade === 'A').length}</span>
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Right Sidebar - Alerts & Smart Money Details */}
-        <aside className="sidebar-right">
-          <div className="alerts-panel">
-            <h2>🔔 Alerts</h2>
-            <div className="alerts-list">
-              {alerts.length === 0 ? (
-                <div className="no-alerts">Waiting for signals...</div>
-              ) : (
-                alerts.map((alert) => (
-                  <div key={alert.id} className={`alert alert-${alert.severity}`}>
-                    <div className="alert-message">{alert.message}</div>
-                    <div className="alert-time">{alert.timestamp.toLocaleTimeString()}</div>
+        <div className="grid-cell bottom-left">
+          <div className="cell-header">SPX Live Chart</div>
+          <div className="chart-placeholder">
+            <div className="chart-mock">
+              <div>SPX Candlestick Chart</div>
+              <div className="chart-info">
+                <span>Real-time data from Polygon API</span>
+                <span>Synchronized with heatmaps</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid-cell bottom-right">
+          <div className="cell-header">🔥 Golden Sweeps Detected</div>
+          <div className="golden-sweeps-list">
+            {goldenSweepsAll.length === 0 ? (
+              <div className="no-sweeps">Waiting for signals...</div>
+            ) : (
+              goldenSweepsAll.slice(0, 10).map((sweep, idx) => (
+                <div key={idx} className={`sweep-item grade-${sweep.grade}`}>
+                  <div className="sweep-info">
+                    <span className="sweep-ticker">{sweep.ticker}</span>
+                    <span className="sweep-strike">{sweep.strike} {sweep.type}</span>
+                    <span className="sweep-exp">{sweep.expiration}</span>
                   </div>
-                ))
-              )}
-            </div>
+                  <div className="sweep-details">
+                    <span className="sweep-premium">${(sweep.premium / 1000).toFixed(0)}K</span>
+                    <span className={`sweep-grade grade-${sweep.grade}`}>{sweep.grade}</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-
-          <div className="smart-money-details">
-            <h2>Smart Money Signals</h2>
-            <div className="signal-item">
-              <span className="signal-label">Golden Sweeps</span>
-              <span className="signal-value">{heatmapData.filter((d) => d.isGoldenSweep).length}</span>
-            </div>
-            <div className="signal-item">
-              <span className="signal-label">High V/OI (>3)</span>
-              <span className="signal-value">{heatmapData.filter((d) => d.vOiRatio > 3).length}</span>
-            </div>
-            <div className="signal-item">
-              <span className="signal-label">Institutional Size</span>
-              <span className="signal-value">{heatmapData.filter((d) => d.premium > 100000).length}</span>
-            </div>
-            <div className="signal-item">
-              <span className="signal-label">Sweeps Detected</span>
-              <span className="signal-value">{heatmapData.filter((d) => d.isSweep).length}</span>
-            </div>
-          </div>
-
-          <div className="spy-integration">
-            <h2>SPY/SPX Monitor</h2>
-            <div className="integration-placeholder">
-              <span>Connected to your analysis tool</span>
-              <button className="integration-btn">Open SPY/SPX</button>
-            </div>
-          </div>
-        </aside>
+        </div>
       </div>
     </div>
   );
