@@ -140,16 +140,8 @@ const SmartMoneyDashboard = () => {
   const handleStrikeClick = (strike) => {
     setSelectedStrike(strike);
     // Generate mock chart data
-    const mockChartData = Array.from({ length: 20 }, (_, i) => ({
-      time: i,
-      open: price + (Math.random() - 0.5) * 10,
-      high: price + (Math.random() * 10),
-      low: price - (Math.random() * 10),
-      close: price + (Math.random() - 0.5) * 10,
-    }));
-  };
 
-  const handleSectorClick = (sector) => {
+    const handleSectorClick = (sector) => {
     setTicker(sector.name); // Simplified - would normally drill into sector stocks
   };
 
