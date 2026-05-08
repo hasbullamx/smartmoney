@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
+const tickerData = {
+  SPX: { price: 5932.80, priceChange: 1.45, basePrice: 5930 },
+  SPY: { price: 585.43, priceChange: 1.30, basePrice: 585 },
+  QQQ: { price: 428.75, priceChange: 2.12, basePrice: 425 },
+  NVDA: { price: 134.52, priceChange: 0.85, basePrice: 135 },
+  AAPL: { price: 234.18, priceChange: -0.45, basePrice: 234 },
+  TSLA: { price: 312.45, priceChange: 3.22, basePrice: 310 },
+};
+
+const expirationRanges = {
+  quick: ['0DTE', '2DTE', '4DTE', '7DTE'],
+  monthly: ['14DTE', '21DTE', '30DTE', '45DTE'],
+};
+
 const SmartMoneyDashboard = () => {
   const [customTicker, setCustomTicker] = useState('QQQ');
   const [customTickerInput, setCustomTickerInput] = useState('');
-  
-  const tickerData = {
-    SPX: { price: 5932.80, priceChange: 1.45, basePrice: 5930 },
-    SPY: { price: 585.43, priceChange: 1.30, basePrice: 585 },
-    QQQ: { price: 428.75, priceChange: 2.12, basePrice: 425 },
-    NVDA: { price: 134.52, priceChange: 0.85, basePrice: 135 },
-    AAPL: { price: 234.18, priceChange: -0.45, basePrice: 234 },
-    TSLA: { price: 312.45, priceChange: 3.22, basePrice: 310 },
-  };
-
-  const expirationRanges = {
-    quick: ['0DTE', '2DTE', '4DTE', '7DTE'],
-    monthly: ['14DTE', '21DTE', '30DTE', '45DTE'],
-  };
 
   const [heatmapDataAll, setHeatmapDataAll] = useState({});
   const [expandedMonthlyData, setExpandedMonthlyData] = useState([]);
@@ -26,44 +26,44 @@ const SmartMoneyDashboard = () => {
   const generateHeatmapData = useCallback((ticker, basePrice, expirations) => {
     const strikes = [];
     const baseStrike = Math.floor(basePrice / 5) * 5;
-    
+
     for (let i = -10; i <= 10; i++) {
       const strike = baseStrike + (i * 5);
-      
+
       expirations.forEach((exp) => {
         const daysToExp = parseInt(exp);
         const isOTM = i !== 0;
         const baseVolume = Math.random() * 5000 + 1000;
         const baseOI = Math.random() * 10000 + 5000;
         const volumeChange = ((Math.random() - 0.3) * 100).toFixed(1);
-        
+
         const premium = (Math.random() * 2000000 + 100000).toFixed(0);
         const vOiRatio = (baseVolume / baseOI).toFixed(2);
         const isAskSide = Math.random() > 0.3;
         const isSweep = Math.random() > 0.7;
-        
-        const isGoldenSweep = 
-          premium > 500000 && 
-          isOTM && 
-          daysToExp <= 7 && 
-          isSweep && 
+
+        const isGoldenSweep =
+          premium > 500000 &&
+          isOTM &&
+          daysToExp <= 7 &&
+          isSweep &&
           isAskSide;
-        
+
         const callOrPut = Math.random() > 0.5 ? 'call' : 'put';
         const isBullish = (callOrPut === 'call' && isAskSide) || (callOrPut === 'put' && !isAskSide);
-        
+
         let scoreContribution = 50;
         scoreContribution += isBullish ? 10 : -10;
         scoreContribution += vOiRatio > 3 ? 15 : 0;
         scoreContribution += premium > 500000 ? 15 : premium > 100000 ? 5 : 0;
         scoreContribution += isSweep ? 10 : 0;
         scoreContribution += isGoldenSweep ? 25 : 0;
-        
+
         const intensity = Math.log(premium / 10000) / Math.log(10);
         const hue = isBullish ? 120 : 0;
         const saturation = Math.min(100, intensity * 30);
         const lightness = 45;
-        
+
         strikes.push({
           strike,
           expiration: exp,
@@ -83,7 +83,7 @@ const SmartMoneyDashboard = () => {
         });
       });
     }
-    
+
     return strikes;
   }, []);
 
@@ -105,17 +105,17 @@ const SmartMoneyDashboard = () => {
     const allData = {};
     const allScores = {};
     const allGoldenSweeps = [];
-    
-    [{ name: 'SPX', data: tickerData.SPX }, 
+
+    [{ name: 'SPX', data: tickerData.SPX },
      { name: 'SPY', data: tickerData.SPY },
      { name: customTicker, data: tickerData[customTicker] || { price: 100, basePrice: 100 } }
     ].forEach(({ name, data }) => {
       const quickData = generateHeatmapData(name, data.basePrice, expirationRanges.quick);
       const monthlyData = generateHeatmapData(name, data.basePrice, expirationRanges.monthly);
-      
+
       allData[name] = quickData;
       allScores[name] = calculateSmartMoneyScore(quickData);
-      
+
       const goldenSweeps = [...quickData, ...monthlyData].filter(d => d.isGoldenSweep);
       goldenSweeps.forEach(sweep => {
         allGoldenSweeps.push({
@@ -129,11 +129,11 @@ const SmartMoneyDashboard = () => {
         });
       });
     });
-    
+
     allGoldenSweeps.sort((a, b) => b.premium - a.premium);
-    
+
     const monthlyData = generateHeatmapData(customTicker, tickerData[customTicker]?.basePrice || 100, expirationRanges.monthly);
-    
+
     setHeatmapDataAll(allData);
     setSmartMoneyScoreAll(allScores);
     setGoldenSweepsAll(allGoldenSweeps.slice(0, 15));
@@ -152,25 +152,25 @@ const SmartMoneyDashboard = () => {
   const renderHeatmap = (ticker, data) => {
     const strikes = [];
     const baseStrike = Math.floor((tickerData[ticker]?.basePrice || 100) / 5) * 5;
-    
+
     for (let i = -10; i <= 10; i++) {
       const strikePrice = baseStrike + (i * 5);
       const strikeData = data.filter(d => d.strike === strikePrice);
       strikes.push({ price: strikePrice, data: strikeData });
     }
-    
+
     return (
       <div className="heatmap-container">
         <div className="heatmap-header">
           <div className="ticker-title">{ticker}</div>
           <div className="price-info">
-            ${tickerData[ticker]?.price.toFixed(2)} 
+            ${tickerData[ticker]?.price.toFixed(2)}
             <span className={tickerData[ticker]?.priceChange >= 0 ? 'positive' : 'negative'}>
               {tickerData[ticker]?.priceChange >= 0 ? '+' : ''}{tickerData[ticker]?.priceChange.toFixed(2)}%
             </span>
           </div>
         </div>
-        
+
         <div className="heatmap-grid">
           <div className="heatmap-body">
             {strikes.map((strike) => (
