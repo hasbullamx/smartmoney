@@ -97,7 +97,6 @@ const SmartMoneyDashboard = () => {
 
   // Initialize data on mount
   useEffect(() => {
-    setLoading(true);
     const data = generateHeatmapData(ticker, price);
     setHeatmapData(data);
     setSectorHeatmap(generateSectorHeatmap());
@@ -119,7 +118,6 @@ const SmartMoneyDashboard = () => {
     const avgScore = Math.round(data.reduce((sum, d) => sum + d.scoreContribution, 0) / data.length);
     setSmartMoneyScore(Math.min(100, Math.max(0, avgScore)));
     
-    setLoading(false);
   }, [ticker, price, generateHeatmapData, generateSectorHeatmap]);
 
   // Simulate real-time updates
@@ -149,7 +147,6 @@ const SmartMoneyDashboard = () => {
       low: price - (Math.random() * 10),
       close: price + (Math.random() - 0.5) * 10,
     }));
-    setChartData(mockChartData);
   };
 
   const handleSectorClick = (sector) => {
