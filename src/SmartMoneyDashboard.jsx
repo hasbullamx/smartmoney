@@ -159,7 +159,7 @@ const SmartMoneyDashboard = () => {
   const filteredFlow = flow.filter(r => flowFilter==='ALL'||r.type===flowFilter||r.cond===flowFilter);
   const filteredSweeps = sweeps.filter(r => flowFilter==='ALL'||r.type===flowFilter||r.cond===flowFilter);
 
-  const BG = '#0d1117', BG2 = '#161b22', BG3 = '#1c2333', BG4 = '#21262d';
+  const BG = '#0d1117', BG2 = '#161b22', BG3 = '#1c2333';
   const TEXT = '#e6edf3', MUTED = '#7d8590', MUTED2 = '#3d444d', BORDER = '#30363d';
 
   // ── GEX COLUMN ──
